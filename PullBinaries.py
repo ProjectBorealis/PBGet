@@ -1,3 +1,5 @@
+#TODO: Create a py file for common variables & functions
+
 import subprocess
 import json
 import glob
@@ -9,7 +11,6 @@ import shutil
 import xml.etree.ElementTree as ET
 import _winapi
 import multiprocessing
-import sys
 
 # Globals
 binaries_folder_name = "Binaries"
