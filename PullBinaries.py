@@ -1,4 +1,5 @@
 #TODO: Create a py file for common variables & functions
+#TODO: Add cmd arg support
 
 import subprocess
 import json
@@ -11,6 +12,7 @@ import shutil
 import xml.etree.ElementTree as ET
 import _winapi
 import multiprocessing
+import sys
 
 # Globals
 binaries_folder_name = "Binaries"
@@ -184,16 +186,16 @@ def ProcessPackage(package):
         return False
 
 def main():
-    print("Starting pull command...")
+    print("Starting PBGet pull command...")
 
     # Do not execute if Unreal Editor is running
     if "UE4Editor.exe" in (p.name() for p in psutil.process_iter()):
         print("Unreal Editor is running. Please close it before running pull command!")
-        exit()
+        sys.exit()
 
     # Register source & apply api key
     if not HandleSources():
-        exit()
+        sys.exit()
 
     # Parse packages xml file
     config_xml = ET.parse(config_name)
@@ -202,11 +204,12 @@ def main():
     pool = multiprocessing.Pool(multiprocessing.cpu_count())
 
     # Async process packages
-    results = pool.map_async(ProcessPackage, [package for package in packages.findall("package")])
+    pool.map_async(ProcessPackage, [package for package in packages.findall("package")])
 
     # Release threads
     pool.close()
     pool.join()
 
 if __name__ == '__main__':
-     main()
+    multiprocessing.freeze_support()
+    main()

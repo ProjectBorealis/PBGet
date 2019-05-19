@@ -1,4 +1,5 @@
 #TODO: Create a py file for common variables & functions
+#TODO: Add cmd arg support
 
 import subprocess
 import json
@@ -12,6 +13,7 @@ import shutil
 import xml.etree.ElementTree as ET
 import _winapi
 import multiprocessing
+import sys
 
 # Globals
 binaries_folder_name = "Binaries"
@@ -33,7 +35,7 @@ def InterruptHandler(signal, frame):
             print("Removed: " + nuspec_file)
         except:
             print("Error while trying to remove temporary nupkg file: " + nuspec_file)
-    exit()
+    sys.exit()
 
 def HandleSources():
     try:
@@ -109,14 +111,14 @@ def GetPluginVersion(plugin_name):
     return "0.0.0"
 
 def main():
-    print("Starting push command...")
+    print("Starting PBGet push command...")
 
     signal.signal(signal.SIGINT, InterruptHandler)
     signal.signal(signal.SIGTERM, InterruptHandler)
 
     # Register source & apply api key
     if not HandleSources():
-        exit()
+        sys.exit()
 
     # Iterate each nuspec file
     for nuspec_file in glob.glob("Nuspec/*.nuspec"):
