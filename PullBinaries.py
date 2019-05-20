@@ -19,19 +19,11 @@ binaries_folder_name = "Binaries"
 config_name = "PBGet.config"
 uproject_path = "../ProjectBorealis.uproject"
 uproject_version_key = "EngineAssociation"
-source_uri = "https://pkgs.dev.azure.com/Project-Borealis/_packaging/Binaries/nuget/v3/index.json"
 
 already_installed_log = "is already installed"
 successfully_installed_log = "Successfully installed"
 package_not_installed_log = "is not found in the following primary"
-source_already_added_log = "Please provide a unique name"
-source_added_successfully_log = "added successfully"
 ##################################################
-
-def HandleSources():
-    print("Checking access permissions...")
-    subprocess.call(["NuGet.exe", "config", "-set", "NuGet.config"])
-    return subprocess.call(["CredentialProvider.VSS.exe", "-U", source_uri])
 
 def CleanOldVersions(package_id, package_version):
     # Find different versions than defined in config file
@@ -83,7 +75,7 @@ def GetSuffix():
         with open(uproject_path, "r") as uproject_file:  
             data = json.load(uproject_file)
             engine_association = data[uproject_version_key]
-            return engine_association[-8:]
+            return "b" + engine_association[-8:]
     except:
         print("Could not parse custom engine version from .uproject file")
         return ""
@@ -172,10 +164,6 @@ def main():
     # Do not execute if Unreal Editor is running
     if "UE4Editor.exe" in (p.name() for p in psutil.process_iter()):
         print("Unreal Editor is running. Please close it before running pull command!")
-        sys.exit()
-
-    # Register source & apply api key
-    if HandleSources() != 0:
         sys.exit()
 
     # Parse packages xml file

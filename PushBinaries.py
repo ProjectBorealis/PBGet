@@ -4,25 +4,15 @@
 import subprocess
 import json
 import glob
-import os.path
-import logging
 import os
-import psutil
 import signal
-import shutil
 import xml.etree.ElementTree as ET
-import _winapi
-import multiprocessing
 import sys
 
 # Globals
-binaries_folder_name = "Binaries"
+nuget_source = "https://api.nuget.org/v3/index.json"
 uproject_path = "../ProjectBorealis.uproject"
 uproject_version_key = "EngineAssociation"
-source_uri = "https://pkgs.dev.azure.com/Project-Borealis/_packaging/Binaries/nuget/v3/index.json"
-
-source_already_added_log = "Please provide a unique name"
-source_added_successfully_log = "added successfully"
 ##################################################
 
 def InterruptHandler(signal, frame):
@@ -36,11 +26,6 @@ def InterruptHandler(signal, frame):
             print("Error while trying to remove temporary nupkg file: " + nuspec_file)
     sys.exit()
 
-def HandleSources():
-    print("Checking access permissions...")
-    subprocess.call(["NuGet.exe", "config", "-set", "NuGet.config"])
-    return subprocess.call(["CredentialProvider.VSS.exe", "-U", source_uri])
-
 def PreparePackage(package_id, package_version):
     # TODO: Error handling
     subprocess.call(["nuget.exe", "pack", "Nuspec/" + package_id + ".nuspec", "-Version", package_version, "-NoPackageAnalysis"])
@@ -48,14 +33,14 @@ def PreparePackage(package_id, package_version):
 
 def PushPackage(package_full_name, source_name):
     # TODO: Error handling
-    subprocess.call(["nuget.exe", "push", "-Source", source_name, "-ApiKey", "AzureDevOps", package_full_name])
+    subprocess.call(["nuget.exe", "push", "-Source", source_name, package_full_name])
 
 def GetSuffix():
     try:
         with open(uproject_path, "r") as uproject_file:  
             data = json.load(uproject_file)
             engine_association = data[uproject_version_key]
-            return engine_association[-8:]
+            return "b" + engine_association[-8:]
     except:
         print("Could not parse custom engine version from .uproject file")
         return ""
@@ -97,10 +82,6 @@ def main():
     signal.signal(signal.SIGINT, InterruptHandler)
     signal.signal(signal.SIGTERM, InterruptHandler)
 
-    # Register source & apply api key
-    if HandleSources() != 0:
-        sys.exit()
-
     # Iterate each nuspec file
     for nuspec_file in glob.glob("Nuspec/*.nuspec"):
         # RegisterSource(nuspec_file)
@@ -134,7 +115,7 @@ def main():
         package_full_name = PreparePackage(package_id, package_version)
 
         # Push prepared package
-        PushPackage(package_full_name, "Binaries")
+        PushPackage(package_full_name, nuget_source)
 
         # Cleanup
         try:
