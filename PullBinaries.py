@@ -19,6 +19,7 @@ binaries_folder_name = "Binaries"
 config_name = "PBGet.config"
 uproject_path = "../ProjectBorealis.uproject"
 uproject_version_key = "EngineAssociation"
+source_uri = "https://pkgs.dev.azure.com/Project-Borealis/_packaging/Binaries/nuget/v3/index.json"
 
 already_installed_log = "is already installed"
 successfully_installed_log = "Successfully installed"

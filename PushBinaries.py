@@ -19,6 +19,7 @@ import sys
 binaries_folder_name = "Binaries"
 uproject_path = "../ProjectBorealis.uproject"
 uproject_version_key = "EngineAssociation"
+source_uri = "https://pkgs.dev.azure.com/Project-Borealis/_packaging/Binaries/nuget/v3/index.json"
 
 source_already_added_log = "Please provide a unique name"
 source_added_successfully_log = "added successfully"
