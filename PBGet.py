@@ -21,6 +21,7 @@ config_name = "PBGet.config"
 uproject_path = "../ProjectBorealis.uproject"
 uproject_version_key = "EngineAssociation"
 
+push_timeout = 3600
 already_installed_log = "is already installed"
 successfully_installed_log = "Successfully installed"
 package_not_installed_log = "is not found in the following primary"
@@ -159,7 +160,7 @@ def PreparePackage(package_id, package_version):
 
 def PushPackage(package_full_name, source_name):
     # TODO: Error handling
-    subprocess.call(["nuget.exe", "push", "-Source", source_name, package_full_name])
+    subprocess.call(["nuget.exe", "push", "-Timeout", push_timeout, "-Source", source_name, package_full_name])
 
 def CleanPackage(package):
     try:
