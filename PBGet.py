@@ -161,6 +161,42 @@ def PushPackage(package_full_name, source_name):
     # TODO: Error handling
     subprocess.call(["nuget.exe", "push", "-Source", source_name, package_full_name])
 
+def CleanPackage(package):
+    try:
+        package_id = package.attrib['id']
+    except:
+        print("Can't find id property for " + package + ". This package won't be cleaned.")
+        return False
+    
+    try:
+        package_version = package.attrib['version']
+    except:
+        print("Can't find version property for " + package_id + ". This package won't be cleaned.")
+        return False
+
+    version_suffix = GetSuffix() 
+
+    # Could not get suffix version, return
+    if version_suffix == "":
+        return False
+
+    package_version = package_version + "-" + version_suffix
+
+    try:
+        package_destination = os.path.join(package.attrib['destination'], binaries_folder_name)
+    except:
+        print("Can't find destination property for " + package_id + ". This package won't be cleaned.")
+        return False
+    
+    full_name = package_id + "." + package_version
+
+    # Hack to remove all versions of this package
+    CleanOldVersions(package_id, "")
+
+    CleanJunction(os.path.abspath(package_destination))
+
+    return True
+
 def ProcessPackage(package):
     try:
         package_id = package.attrib['id']
@@ -207,8 +243,29 @@ def ProcessPackage(package):
         CleanJunction(os.path.abspath(package_destination))
         return False
 
+def CommandClean():
+    print("Initiating PBGet clean command...")
+
+    # Do not execute if Unreal Editor is running
+    if "UE4Editor.exe" in (p.name() for p in psutil.process_iter()):
+        print("Unreal Editor is running. Please close it before running pull command!")
+        sys.exit()
+
+    # Parse packages xml file
+    config_xml = ET.parse(config_name)
+    packages = config_xml.getroot()
+
+    pool = multiprocessing.Pool(multiprocessing.cpu_count())
+
+    # Async process packages
+    pool.map_async(CleanPackage, [package for package in packages.findall("package")])
+
+    # Release threads
+    pool.close()
+    pool.join()
+
 def CommandPull():
-    print("Starting PBGet pull command...")
+    print("Initiating PBGet pull command...")
 
     # Do not execute if Unreal Editor is running
     if "UE4Editor.exe" in (p.name() for p in psutil.process_iter()):
@@ -229,7 +286,7 @@ def CommandPull():
     pool.join()
 
 def CommandPush():
-    print("Starting PBGet push command...")
+    print("Initiating PBGet push command...")
 
     signal.signal(signal.SIGINT, PushInterruptHandler)
     signal.signal(signal.SIGTERM, PushInterruptHandler)
@@ -280,7 +337,7 @@ def CommandPush():
 def main():
     parser = argparse.ArgumentParser(description='PBGet v' + pbget_version)
 
-    FUNCTION_MAP = {'pull' : CommandPull, 'push' : CommandPush }
+    FUNCTION_MAP = {'pull' : CommandPull, 'push' : CommandPush, 'clean' : CommandClean}
 
     parser.add_argument('command', choices=FUNCTION_MAP.keys())
 
