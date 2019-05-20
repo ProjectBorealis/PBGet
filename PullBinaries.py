@@ -16,11 +16,9 @@ import sys
 
 # Globals
 binaries_folder_name = "Binaries"
-config_name = "ProjectBorealisPackages.config"
+config_name = "PBGet.config"
 uproject_path = "../ProjectBorealis.uproject"
 uproject_version_key = "EngineAssociation"
-read_only_api_key = "2ybrahtgwjb4lo6ww5h63u63wx3fkcx2rbvtnfwfdo44kyrwbyxa"
-source_uri = "https://pkgs.dev.azure.com/Project-Borealis/_packaging/Binaries/nuget/v3/index.json"
 
 already_installed_log = "is already installed"
 successfully_installed_log = "Successfully installed"
@@ -30,27 +28,9 @@ source_added_successfully_log = "added successfully"
 ##################################################
 
 def HandleSources():
-    try:
-        output = subprocess.check_output(["nuget.exe", "sources", "Add", "-Name", binaries_folder_name, "-Source", source_uri], stderr=subprocess.STDOUT)
-        subprocess.check_output(["nuget.exe", "setapikey", read_only_api_key, "-Source", binaries_folder_name])
-    except subprocess.CalledProcessError as e:
-        if source_already_added_log in str(e.output):
-            print("Source address is valid: " + source_uri)
-            return True
-        else:
-            print("Unknown error while trying to add " + source_uri + " with name of " + binaries_folder_name)
-            print("Trace log:")
-            print(e.output)
-            return False
-
-    if source_added_successfully_log in str(output):
-        print("Source " + source_uri + " added successfully with name of " + binaries_folder_name)
-        return True
-    else:
-        print("Unknown error while trying to add " + source_uri + " with name of " + binaries_folder_name)
-        print("Trace log:")
-        print(output)
-        return False
+    print("Checking access permissions...")
+    subprocess.call(["NuGet.exe", "config", "-set", "NuGet.config"])
+    return subprocess.call(["CredentialProvider.VSS.exe", "-U", source_uri])
 
 def CleanOldVersions(package_id, package_version):
     # Find different versions than defined in config file
@@ -194,7 +174,7 @@ def main():
         sys.exit()
 
     # Register source & apply api key
-    if not HandleSources():
+    if HandleSources() != 0:
         sys.exit()
 
     # Parse packages xml file
