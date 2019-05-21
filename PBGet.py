@@ -21,7 +21,7 @@ import colorama
 from colorama import Fore, Back, Style
 
 # Globals
-pbget_version = "0.0.1"
+pbget_version = "0.0.3"
 
 binaries_folder_name = "Binaries"
 nuget_source = "https://api.nuget.org/v3/index.json"
@@ -280,12 +280,12 @@ def ProcessPackage(package):
         RemoveFaultyJunction(os.path.abspath(package_destination))
 
 def CommandResetCache():
-    print("Initiating PBGet reset cache command...")
+    LogSuccess("\nInitiating PBGet reset cache command...", False)
     print("\n*************************\n")
     return subprocess.call(["nuget.exe", "locals", "all", "-list"])
 
 def CommandClean():
-    print("Initiating PBGet clean command...")
+    LogSuccess("\nInitiating PBGet clean command...", False)
     print("\n*************************\n")
 
     # Do not execute if Unreal Editor is running
@@ -307,7 +307,7 @@ def CommandClean():
     pool.join()
 
 def CommandPull():
-    print("Initiating PBGet pull command...")
+    LogSuccess("\nInitiating PBGet pull command...", False)
     print("\n*************************\n")
 
     # Do not execute if Unreal Editor is running
@@ -339,7 +339,7 @@ def CommandPull():
     pool.join()
 
 def CommandPush():
-    print("Initiating PBGet push command...")
+    LogSuccess("\nInitiating PBGet push command...", False)
     print("\n*************************\n")
 
     signal.signal(signal.SIGINT, PushInterruptHandler)
@@ -402,12 +402,11 @@ def main():
     
     print("\n*************************\n")
     if error_state.value == 1:
-        LogError(args.command + " operation completed with errors")
+        LogError("PBGet " + args.command + " operation completed with errors\n")
     elif warning_state.value == 1:
-        LogWarning(args.command + " operation completed with warnings")
+        LogWarning("PBGet " + args.command + " operation completed with warnings\n")
     else:
-        LogSuccess(args.command + " operation completed without errors")
-
+        LogSuccess("PBGet " + args.command + " operation completed without errors\n")
     sys.exit(error_state.value)
 
 if __name__ == '__main__':
