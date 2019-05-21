@@ -219,7 +219,7 @@ def PreparePackage(package_id, package_version):
     return subprocess.call(["nuget.exe", "pack", "Nuspec/" + package_id + ".nuspec", "-Version", package_version, "-NoPackageAnalysis"])
 
 def PushPackage(package_full_name, source_name):
-    return subprocess.call(["nuget.exe", "push", "-Timeout", push_timeout, "-Source", source_name, package_full_name])
+    return subprocess.call(["nuget.exe", "push", "-Timeout", str(push_timeout), "-Source", source_name, package_full_name])
 
 def CleanPackage(package):
     try:
