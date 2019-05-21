@@ -76,9 +76,9 @@ def PushInterruptHandler(signal, frame):
             sys.exit(1)
     sys.exit(0)
 
-def CleanOldVersions(package_id, package_version):
+def CleanPreviousInstallations(package_id):
     # Find different versions than defined in config file
-    other_versions = [name for name in os.listdir(".") if os.path.isdir(name) and name.split(".")[0] == package_id and name.split(package_id + ".")[1] != package_version]
+    other_versions = [name for name in os.listdir(".") if os.path.isdir(name) and name.split(".")[0] == package_id]
     
     for package_root in other_versions:
         try:
@@ -153,7 +153,33 @@ def GetSuffix():
     
     return ""
 
-def CleanJunction(destination, purge = False):
+def CheckInstallation(package_id, package_version):
+    # Check installation correctness from file list in related .nuspec file
+    tree = ET.parse("Nuspec/" + package_id + ".nuspec")
+    files = tree.findall('files/file')
+    for file_entry in files:
+        file_path = file_entry.attrib['src']
+        file_path = file_path[file_path.index('/') + 1:]
+        if not os.path.isfile(os.path.abspath(file_path)):
+            return False
+    
+    if not os.path.isdir(os.path.abspath(package_id + "." + package_version)):
+        return False
+    
+    # Package installation seems good
+    return True
+        
+def RemoveFaultyJunction(destination):
+    if os.path.isdir(destination):
+        try:
+            shutil.rmtree(destination)
+        except:
+            try:
+                os.remove(destination)
+            except:
+                return False
+
+def PurgeDestionation(destination):
     if os.path.islink(destination):
         try:
             os.unlink(destination)
@@ -162,18 +188,13 @@ def CleanJunction(destination, purge = False):
 
     elif os.path.isdir(destination):
         try:
-            if purge:
-                try:
-                    shutil.rmtree(destination)
-                    print("Clearing existing folder in " + destination)
-                except:
-                    print("Removing junction point from " + destination)
-                    os.remove(destination)
-            else:
-                # Only remove the junction point, do not touch actual package files
-                os.remove(destination)
+            shutil.rmtree(destination)
         except:
-            return False
+            try:
+                os.remove(destination)
+            except:
+                return False
+
     elif os.path.isfile(destination):
         # Somehow it's a file, remove it
         try:
@@ -185,7 +206,7 @@ def CleanJunction(destination, purge = False):
 
 def CreateJunctionFromPackage(source, destination):
     # Before creating a junction, clean the destionation path first
-    if not CleanJunction(destination):
+    if not PurgeDestionation(destination):
         LogError("Can't clean existing files in destionation junction point: " + destination)
        
     # Create junction from package contents to destination
@@ -214,10 +235,10 @@ def CleanPackage(package):
         return
 
     # Hack to remove all versions of this package
-    CleanOldVersions(package_id, "")
+    CleanPreviousInstallations(package_id)
 
     abs_destionation = os.path.abspath(package_destination)
-    if not CleanJunction(abs_destionation, True):
+    if not PurgeDestionation(abs_destionation):
         LogError("Can't clean existing files in destionation junction point: " + abs_destionation)
         return
 
@@ -227,7 +248,7 @@ def ProcessPackage(package):
     except:
         LogError("Can't find id property for " + package + ". This package won't be installed.")
         return
-    
+   
     try:
         package_version = package.attrib['version']
     except:
@@ -249,13 +270,14 @@ def ProcessPackage(package):
         LogError("Can't find destination property for " + package_id + ". This package won't be installed.")
         return
     
-    CleanOldVersions(package_id, package_version)
+    CleanPreviousInstallations(package_id)
 
     full_name = package_id + "." + package_version
     if InstallPackage(package_id, package_version):
         CreateJunctionFromPackage(os.path.abspath(os.path.join(full_name, binaries_folder_name)), os.path.abspath(package_destination))
     else:
-        CleanJunction(os.path.abspath(package_destination))
+        # Try removing faulty junction
+        RemoveFaultyJunction(os.path.abspath(package_destination))
 
 def CommandResetCache():
     print("Initiating PBGet reset cache command...")
@@ -297,11 +319,19 @@ def CommandPull():
     config_xml = ET.parse(config_name)
     packages = config_xml.getroot()
 
-    pool = ThreadPool(cpu_count())
-
-    # Async process packages
     fmt = '{:<28} {:<37} {:<10}'
     print(fmt.format("  ~Package Name~", "~Version~", "~Result~"))
+
+    fmt = '{:<25} {:<25} {:<40}'
+    for package in packages.findall("package"):
+        package_id = package.attrib['id']
+        package_version = package.attrib['version'] + "-" + GetSuffix()
+        if CheckInstallation(package_id, package_version):
+            LogSuccess(fmt.format(package_id, package_version, "Version already installed"), False)
+            packages.remove(package)
+
+    # Async process packages
+    pool = ThreadPool(cpu_count())
     pool.map_async(ProcessPackage, [package for package in packages.findall("package")])
 
     # Release threads
