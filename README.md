@@ -1,2 +1,2 @@
 # PBGet
-Nuget package manager python wrapper for managing plugin & main binary files in Unreal Engine based projects.
+Nuget python wrapper for managing binary files of Project Borealis
