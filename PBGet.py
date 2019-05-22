@@ -1,33 +1,35 @@
 import subprocess
-import json
 import glob
 import os.path
 import os
-import psutil
-import shutil
 import signal
 import xml.etree.ElementTree as ET
 import _winapi
 import sys
 import argparse
 
+# PBGet Imports
+import PBVersion
+import PBTools
+
+# Multiprocessing
 from multiprocessing.pool import ThreadPool
 from multiprocessing import Manager
 from multiprocessing import Value
 from multiprocessing import cpu_count
 from multiprocessing import freeze_support
 
+# Colored Output
 import colorama
 from colorama import Fore, Back, Style
 
-# Globals
+
+### Globals
 pbget_version = "0.0.3"
 
 binaries_folder_name = "Binaries"
 nuget_source = "https://api.nuget.org/v3/index.json"
-config_name = "PBGet.config"
-uproject_path = "../ProjectBorealis.uproject"
-uproject_version_key = "EngineAssociation"
+config_name = "PBGet.packages"
 
 package_ext = ".nupkg"
 metadata_ext = ".nuspec"
@@ -39,8 +41,9 @@ warning_state = Value('i', 0)
 already_installed_log = "is already installed"
 successfully_installed_log = "Successfully installed"
 package_not_installed_log = "is not found in the following primary"
-##################################################
+############################################################################
 
+### LOGGER
 def LogSuccess(message, prefix = True):
     global warning_state
     if prefix:
@@ -63,30 +66,9 @@ def LogError(message, prefix = True):
         print(Fore.RED +  "ERROR: " + message + Style.RESET_ALL)
     else:
         print(Fore.RED + message + Style.RESET_ALL)
+############################################################################
 
-def PushInterruptHandler(signal, frame):
-    # Cleanup
-    print("Cleaning up temporary .nuget packages...")
-    for nuspec_file in glob.glob("*.nupkg"):
-        try:
-            os.remove(nuspec_file)
-            print("Removed: " + nuspec_file)
-        except:
-            print(Fore.RED + "Error while trying to remove temporary nupkg file: " + nuspec_file + Style.RESET_ALL)
-            sys.exit(1)
-    sys.exit(0)
-
-def CleanPreviousInstallations(package_id):
-    # Find different versions than defined in config file
-    other_versions = [name for name in os.listdir(".") if os.path.isdir(name) and name.split(".")[0] == package_id]
-    
-    for package_root in other_versions:
-        try:
-            shutil.rmtree(os.path.abspath(package_root))
-        except:
-            # Removal was unsuccessful
-            print("Cannot clean deprecated package in " + os.path.abspath(package_root))
-
+### Subprocess commands
 def InstallPackage(package_id, package_version):
     output = subprocess.getoutput(["nuget.exe", "install", package_id, "-Version", package_version, "-NonInteractive"])
 
@@ -108,105 +90,39 @@ def InstallPackage(package_id, package_version):
 
     print()
 
-def GetPluginVersion(plugin_name):
-    plugin_root = "../Plugins/" + plugin_name
-    uplugin_version_key = "VersionName"
+def PreparePackage(package_id, package_version):
+    return subprocess.call(["nuget.exe", "pack", "Nuspec/" + package_id + metadata_ext, "-Version", package_version, "-NoPackageAnalysis"])
 
-    for uplugin_path in glob.glob(plugin_root + "/*.uplugin"):
-        with open(uplugin_path, "r") as uplugin_file:  
-            data = json.load(uplugin_file)
-            version = data[uplugin_version_key]
+def PushPackage(package_full_name, source_name):
+    return subprocess.call(["nuget.exe", "push", "-Timeout", str(push_timeout), "-Source", source_name, package_full_name])
+############################################################################
 
-            # Some plugins have strange versions with only major and minor versions, add patch version for compatibility with nuget
-            if version.count('.') == 1:
-                version = version + ".0"
-            
-            return version
-
-    return "0.0.0"
-
-def GetProjectVersion():
-    defaultgame_path = "../Config/DefaultGame.ini"
-    defaultgame_version_key = "ProjectVersion="
-
-    with open(defaultgame_path, "r") as ini_file:
-        for ln in ini_file:
-            if ln.startswith(defaultgame_version_key):
-                return ln.replace(defaultgame_version_key, '').rstrip()
-
-    return "0.0.0"
-
-def GetSuffix():
-    try:
-        with open(uproject_path, "r") as uproject_file:  
-            data = json.load(uproject_file)
-            engine_association = data[uproject_version_key]
-            build_version = "b" + engine_association[-8:]
-
-            # We're using local build version in .uproject file
-            if "}" in build_version:
-                return ""
-
-            return "b" + engine_association[-8:]
-    except:
-        return ""
-    
-    return ""
-
-def CheckInstallation(package_id, package_version):
-    # Check installation correctness from file list in related .nuspec file
-    tree = ET.parse("Nuspec/" + package_id + ".nuspec")
-    files = tree.findall('files/file')
-    for file_entry in files:
-        file_path = file_entry.attrib['src']
-        file_path = file_path[file_path.index('/') + 1:]
-        if not os.path.isfile(os.path.abspath(file_path)):
-            return False
-    
-    if not os.path.isdir(os.path.abspath(package_id + "." + package_version)):
-        return False
-    
-    # Package installation seems good
-    return True
-        
-def RemoveFaultyJunction(destination):
-    if os.path.isdir(destination):
+### Other Functions
+def PushInterruptHandler(signal, frame):
+    # Cleanup
+    print("Cleaning up temporary .nuget packages...")
+    for nuspec_file in glob.glob("*.nupkg"):
         try:
-            shutil.rmtree(destination)
+            os.remove(nuspec_file)
+            print("Removed: " + nuspec_file)
         except:
-            try:
-                os.remove(destination)
-            except:
-                return False
+            print(Fore.RED + "Error while trying to remove temporary nupkg file: " + nuspec_file + Style.RESET_ALL)
+            sys.exit(1)
+    sys.exit(0)
 
-def PurgeDestionation(destination):
-    if os.path.islink(destination):
-        try:
-            os.unlink(destination)
-        except:
-            return False
-
-    elif os.path.isdir(destination):
-        try:
-            shutil.rmtree(destination)
-        except:
-            try:
-                os.remove(destination)
-            except:
-                return False
-
-    elif os.path.isfile(destination):
-        # Somehow it's a file, remove it
-        try:
-            os.remove(destination)
-        except:
-            return False
-
-    return True
+def IgnoreExistingInstallations(packages):
+    fmt = '{:<25} {:<25} {:<40}'
+    for package in packages.findall("package"):
+        package_id = package.attrib['id']
+        package_version = package.attrib['version'] + "-" + PBVersion.GetSuffix()
+        if PBTools.CheckInstallation(package_id, package_version):
+            LogSuccess(fmt.format(package_id, package_version, "Version already installed"), False)
+            packages.remove(package)
+    return packages
 
 def CreateJunctionFromPackage(source, destination):
     # Before creating a junction, clean the destionation path first
-    if not PurgeDestionation(destination):
+    if not PBTools.PurgeDestionation(destination):
         LogError("Can't clean existing files in destionation junction point: " + destination)
        
     # Create junction from package contents to destination
@@ -214,12 +130,6 @@ def CreateJunctionFromPackage(source, destination):
         _winapi.CreateJunction(source, destination)
     except:
         LogError("Can't create junction point from " + source + " to " + destination)
-
-def PreparePackage(package_id, package_version):
-    return subprocess.call(["nuget.exe", "pack", "Nuspec/" + package_id + ".nuspec", "-Version", package_version, "-NoPackageAnalysis"])
-
-def PushPackage(package_full_name, source_name):
-    return subprocess.call(["nuget.exe", "push", "-Timeout", str(push_timeout), "-Source", source_name, package_full_name])
 
 def CleanPackage(package):
     try:
@@ -235,10 +145,10 @@ def CleanPackage(package):
         return
 
     # Hack to remove all versions of this package
-    CleanPreviousInstallations(package_id)
+    PBTools.CleanPreviousInstallations(package_id)
 
     abs_destionation = os.path.abspath(package_destination)
-    if not PurgeDestionation(abs_destionation):
+    if not PBTools.PurgeDestionation(abs_destionation):
         LogError("Can't clean existing files in destionation junction point: " + abs_destionation)
         return
 
@@ -255,7 +165,7 @@ def ProcessPackage(package):
         LogError("Can't find version property for " + package_id + ". This package won't be installed.")
         return
 
-    version_suffix = GetSuffix() 
+    version_suffix = PBVersion.GetSuffix() 
 
     # Could not get suffix version, return
     if version_suffix == "":
@@ -270,15 +180,17 @@ def ProcessPackage(package):
         LogError("Can't find destination property for " + package_id + ". This package won't be installed.")
         return
     
-    CleanPreviousInstallations(package_id)
+    PBTools.CleanPreviousInstallations(package_id)
 
     full_name = package_id + "." + package_version
     if InstallPackage(package_id, package_version):
         CreateJunctionFromPackage(os.path.abspath(os.path.join(full_name, binaries_folder_name)), os.path.abspath(package_destination))
     else:
         # Try removing faulty junction
-        RemoveFaultyJunction(os.path.abspath(package_destination))
+        PBTools.RemoveFaultyJunction(os.path.abspath(package_destination))
+############################################################################
 
+### Argparser Command Functions
 def CommandResetCache():
     LogSuccess("\nInitiating PBGet reset cache command...", False)
     print("\n*************************\n")
@@ -289,7 +201,7 @@ def CommandClean():
     print("\n*************************\n")
 
     # Do not execute if Unreal Editor is running
-    if "UE4Editor.exe" in (p.name() for p in psutil.process_iter()):
+    if PBTools.CheckRunningProcess("UE4Editor.exe"):
         LogError("Unreal Editor is running. Please close it before running pull command")
         sys.exit(1)
 
@@ -311,25 +223,17 @@ def CommandPull():
     print("\n*************************\n")
 
     # Do not execute if Unreal Editor is running
-    if "UE4Editor.exe" in (p.name() for p in psutil.process_iter()):
+    if PBTools.CheckRunningProcess("UE4Editor.exe"):
         LogError("Unreal Editor is running. Please close it before running pull command")
         sys.exit(1)
 
     # Parse packages xml file
     config_xml = ET.parse(config_name)
-    packages = config_xml.getroot()
 
     fmt = '{:<28} {:<37} {:<10}'
     print(fmt.format("  ~Package Name~", "~Version~", "~Result~"))
-
-    fmt = '{:<25} {:<25} {:<40}'
-    for package in packages.findall("package"):
-        package_id = package.attrib['id']
-        package_version = package.attrib['version'] + "-" + GetSuffix()
-        if CheckInstallation(package_id, package_version):
-            LogSuccess(fmt.format(package_id, package_version, "Version already installed"), False)
-            packages.remove(package)
-
+    packages = IgnoreExistingInstallations(config_xml.getroot())
+    
     # Async process packages
     pool = ThreadPool(cpu_count())
     pool.map_async(ProcessPackage, [package for package in packages.findall("package")])
@@ -342,8 +246,8 @@ def CommandPush():
     LogSuccess("\nInitiating PBGet push command...", False)
     print("\n*************************\n")
 
-    signal.signal(signal.SIGINT, PushInterruptHandler)
-    signal.signal(signal.SIGTERM, PushInterruptHandler)
+    signal.signal(signal.SIGINT, PBTools.PushInterruptHandler)
+    signal.signal(signal.SIGTERM, PBTools.PushInterruptHandler)
 
     # Iterate each nuspec file
     for nuspec_file in glob.glob("Nuspec/*.nuspec"):
@@ -355,9 +259,9 @@ def CommandPush():
         package_version = "0.0.0"
 
         if package_type == "Main":
-            package_version = GetProjectVersion()
+            package_version = PBVersion.GetProjectVersion()
         elif package_type == "Plugin":
-            package_version = GetPluginVersion(package_id)
+            package_version = PBVersion.GetPluginVersion(package_id)
         else:
             print(Fore.YELLOW + "Unknown .nuspec package tag found for " + package_id + ". Skipping..." + Style.RESET_ALL)
             continue
@@ -367,7 +271,7 @@ def CommandPush():
             continue
 
         # Get engine version suffix
-        suffix_version = GetSuffix()
+        suffix_version = PBVersion.GetSuffix()
         if suffix_version == "":
             LogError("Could not parse custom engine version from .uproject file.")
             break
@@ -388,6 +292,7 @@ def CommandPush():
             print(Fore.YELLOW +  "Cannot remove temporary nupkg file: " + package_full_name)
 
         LogSuccess("Push successful: " + package_id + "." + package_version)
+############################################################################
 
 def main():
     parser = argparse.ArgumentParser(description='PBGet v' + pbget_version)
