@@ -31,6 +31,8 @@ binaries_folder_name = "Binaries"
 nuget_source = "https://api.nuget.org/v3/index.json"
 config_name = "PBGet.packages"
 
+push_package_input = ""
+
 package_ext = ".nupkg"
 metadata_ext = ".nuspec"
 
@@ -144,7 +146,6 @@ def CleanPackage(package):
         LogError("Can't find destination property for " + package_id + ". This package won't be cleaned.")
         return
 
-    # Hack to remove all versions of this package
     PBTools.CleanPreviousInstallations(package_id)
 
     abs_destionation = os.path.abspath(package_destination)
@@ -188,6 +189,52 @@ def ProcessPackage(package):
     else:
         # Try removing faulty junction
         PBTools.RemoveFaultyJunction(os.path.abspath(package_destination))
+
+def PushFromNuspec(nuspec_file):
+    tree = ET.parse(nuspec_file)
+    root = tree.getroot()
+
+    package_id = root.find('metadata/id').text
+    package_type = root.find('metadata/tags').text
+    package_version = "0.0.0"
+
+    if package_type == "Main":
+        package_version = PBVersion.GetProjectVersion()
+    elif package_type == "Plugin":
+        package_version = PBVersion.GetPluginVersion(package_id)
+    else:
+        LogWarning("Unknown .nuspec package tag found for " + package_id + ". Skipping...")
+        return False
+
+    if(package_version == "0.0.0"):
+        LogWarning("Could not get version for " + package_id + ". Skipping...")
+        return False
+
+    # Get engine version suffix
+    suffix_version = PBVersion.GetSuffix()
+    if suffix_version == "":
+        LogError("Could not parse custom engine version from .uproject file.")
+        return False
+
+    package_version = package_version + "-" + suffix_version
+    package_full_name = package_id + "." + package_version + package_ext
+
+    # Create nupkg file
+    PreparePackage(package_id, package_version)
+
+    # Push prepared package
+    if PushPackage(package_full_name, nuget_source) != 0:
+        LogError("Could not push package into source: " + package_full_name)
+        return False
+
+    # Cleanup
+    try:
+        os.remove(package_full_name)
+    except:
+        LogWarning("Cannot remove temporary nupkg file: " + package_full_name)
+
+    LogSuccess("Push successful: " + package_id + "." + package_version)
+    return True
 ############################################################################
 
 ### Argparser Command Functions
@@ -246,52 +293,18 @@ def CommandPush():
     LogSuccess("\nInitiating PBGet push command...", False)
     print("\n*************************\n")
 
-    signal.signal(signal.SIGINT, PBTools.PushInterruptHandler)
-    signal.signal(signal.SIGTERM, PBTools.PushInterruptHandler)
+    signal.signal(signal.SIGINT, PushInterruptHandler)
+    signal.signal(signal.SIGTERM, PushInterruptHandler)
 
-    # Iterate each nuspec file
-    for nuspec_file in glob.glob("Nuspec/*.nuspec"):
-        tree = ET.parse(nuspec_file)
-        root = tree.getroot()
-
-        package_id = root.find('metadata/id').text
-        package_type = root.find('metadata/tags').text
-        package_version = "0.0.0"
-
-        if package_type == "Main":
-            package_version = PBVersion.GetProjectVersion()
-        elif package_type == "Plugin":
-            package_version = PBVersion.GetPluginVersion(package_id)
-        else:
-            print(Fore.YELLOW + "Unknown .nuspec package tag found for " + package_id + ". Skipping..." + Style.RESET_ALL)
-            continue
-
-        if(package_version == "0.0.0"):
-            print(Fore.YELLOW + "Could not get version for " + package_id + ". Skipping..." + Style.RESET_ALL)
-            continue
-
-        # Get engine version suffix
-        suffix_version = PBVersion.GetSuffix()
-        if suffix_version == "":
-            LogError("Could not parse custom engine version from .uproject file.")
-            break
-
-        package_version = package_version + "-" + suffix_version
-        package_full_name = package_id + "." + package_version + package_ext
-
-        # Create nupkg file
-        PreparePackage(package_id, package_version)
-
-        # Push prepared package
-        PushPackage(package_full_name, nuget_source)
-
-        # Cleanup
-        try:
-            os.remove(package_full_name)
-        except:
-            print(Fore.YELLOW +  "Cannot remove temporary nupkg file: " + package_full_name)
-
-        LogSuccess("Push successful: " + package_id + "." + package_version)
+    if push_package_input == "":
+        # No package name provided by user
+        LogSuccess("All packages will be pushed...", False)
+        # Iterate each nuspec file
+        for nuspec_file in glob.glob("Nuspec/*.nuspec"):
+            PushFromNuspec(nuspec_file)
+    else:
+        LogSuccess("Only " + push_package_input + " will be pushed...", False)
+        PushFromNuspec("Nuspec/" + push_package_input + ".nuspec")
 ############################################################################
 
 def main():
@@ -300,8 +313,15 @@ def main():
     FUNCTION_MAP = {'pull' : CommandPull, 'push' : CommandPush, 'clean' : CommandClean, 'resetcache' : CommandResetCache}
 
     parser.add_argument('command', choices=FUNCTION_MAP.keys())
+    parser.add_argument("--package")
 
     args = parser.parse_args()
+
+    global push_package_input
+    if PBTools.CheckInputPackage(args.package):
+        push_package_input = args.package
+        push_package_input.replace(".nuspec", "")
+
     func = FUNCTION_MAP[args.command]
     func()
     

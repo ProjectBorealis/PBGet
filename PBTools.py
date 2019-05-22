@@ -4,6 +4,14 @@ import os
 import psutil
 import shutil
 
+def CheckInputPackage(package_name):
+    # No package name given by user, continue
+    if package_name == None or package_name.strip() == "":
+        return False
+
+    package_path = "Nuspec/" + package_name + ".nuspec"
+    return os.path.isfile(os.path.abspath(package_path))
+
 def CheckRunningProcess(process_name):
     if process_name in (p.name() for p in psutil.process_iter()):
         return True
