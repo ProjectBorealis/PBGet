@@ -25,10 +25,10 @@ from colorama import Fore, Back, Style
 
 
 ### Globals
-pbget_version = "0.0.3"
+pbget_version = "0.0.4"
 
 binaries_folder_name = "Binaries"
-nuget_source = "https://api.nuget.org/v3/index.json"
+nuget_source = ""
 config_name = "PBGet.packages"
 
 push_package_input = ""
@@ -97,6 +97,9 @@ def PreparePackage(package_id, package_version):
 
 def PushPackage(package_full_name, source_name):
     return subprocess.call(["nuget.exe", "push", "-Timeout", str(push_timeout), "-Source", source_name, package_full_name])
+
+def SetApiKey(api_key):
+    return subprocess.call(["nuget.exe", "SetApiKey", api_key])
 ############################################################################
 
 ### Other Functions
@@ -313,14 +316,32 @@ def main():
     FUNCTION_MAP = {'pull' : CommandPull, 'push' : CommandPush, 'clean' : CommandClean, 'resetcache' : CommandResetCache}
 
     parser.add_argument('command', choices=FUNCTION_MAP.keys())
-    parser.add_argument("--package")
+    parser.add_argument("--package", "-p", help="Single package name for push command. If not provided, each package having a metadata in Nuspec folder will be pushed instead")
+    parser.add_argument("--apikey", "-k", help="Required api key for push command")
+    parser.add_argument("--source", "-s", help="Source address for push command")
 
     args = parser.parse_args()
 
-    global push_package_input
-    if PBTools.CheckInputPackage(args.package):
-        push_package_input = args.package
-        push_package_input.replace(".nuspec", "")
+    if args.command == "push":
+        if PBTools.CheckInputPackage(args.package):
+            global push_package_input
+            push_package_input = args.package
+            push_package_input.replace(".nuspec", "")
+
+        if not (args.apikey is None):
+            SetApiKey(args.apikey)
+        else:
+            LogError("An API key should be provided with --apikey argument for push command")
+
+        if not (args.source is None):
+            global nuget_source
+            nuget_source = args.source
+        else:
+            LogError("A valid source address should be provided with --source argument for push command")
+
+    if error_state.value == 1:
+        LogError("PBGet " + args.command + " operation completed with errors\n")
+        sys.exit(error_state.value)
 
     func = FUNCTION_MAP[args.command]
     func()
