@@ -25,7 +25,7 @@ from colorama import Fore, Back, Style
 
 
 ### Globals
-pbget_version = "0.0.4"
+pbget_version = "0.0.5"
 
 binaries_folder_name = "Binaries"
 nuget_source = ""
