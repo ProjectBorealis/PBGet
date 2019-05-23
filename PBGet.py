@@ -115,6 +115,18 @@ def PushInterruptHandler(signal, frame):
             sys.exit(1)
     sys.exit(0)
 
+def UpdateVersion(package_id, new_package_version):
+    config_xml = ET.parse(config_name)
+    for package in config_xml.getroot().findall("package"):
+        if package.attrib['id'] == package_id and package.attrib['version'] != new_package_version:
+            package.attrib['version'] = new_package_version
+            try:
+                config_xml.write(config_name)
+            except:
+                return False
+            return True
+    return False
+
 def IgnoreExistingInstallations(packages):
     fmt = '{:<25} {:<25} {:<40}'
     for package in packages.findall("package"):
@@ -219,11 +231,11 @@ def PushFromNuspec(nuspec_file):
         LogError("Could not parse custom engine version from .uproject file.")
         return False
 
-    package_version = package_version + "-" + suffix_version
-    package_full_name = package_id + "." + package_version + package_ext
+    package_full_version = package_version + "-" + suffix_version
+    package_full_name = package_id + "." + package_full_version + package_ext
 
     # Create nupkg file
-    PreparePackage(package_id, package_version)
+    PreparePackage(package_id, package_full_version)
 
     # Push prepared package
     if PushPackage(package_full_name, nuget_source) != 0:
@@ -236,7 +248,14 @@ def PushFromNuspec(nuspec_file):
     except:
         LogWarning("Cannot remove temporary nupkg file: " + package_full_name)
 
-    LogSuccess("Push successful: " + package_id + "." + package_version)
+    LogSuccess("Push successful: " + package_id + "." + package_full_version)
+
+    # Update version in the packages file
+    if UpdateVersion(package_id, package_version):
+        LogSuccess("Version for " + package_id + " successfully updated as " + package_version + " in " + config_name)
+    else:
+        LogWarning("Problem while updating version for " + package_id + " as " + package_version + " in " + config_name + ". Consider changing the version manually.")
+
     return True
 ############################################################################
 
