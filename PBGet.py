@@ -25,7 +25,7 @@ from colorama import Fore, Back, Style
 
 
 ### Globals
-pbget_version = "0.0.5"
+pbget_version = "0.0.6"
 
 binaries_folder_name = "Binaries"
 nuget_source = ""
@@ -125,7 +125,7 @@ def UpdateVersion(package_id, new_package_version):
             except:
                 return False
             return True
-    return False
+    return True
 
 def IgnoreExistingInstallations(packages):
     fmt = '{:<25} {:<25} {:<40}'
@@ -263,7 +263,7 @@ def PushFromNuspec(nuspec_file):
 def CommandResetCache():
     LogSuccess("\nInitiating PBGet reset cache command...", False)
     print("\n*************************\n")
-    return subprocess.call(["nuget.exe", "locals", "all", "-list"])
+    return subprocess.call(["nuget.exe", "locals", "all", "-clear"])
 
 def CommandClean():
     LogSuccess("\nInitiating PBGet clean command...", False)
