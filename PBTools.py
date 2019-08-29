@@ -4,7 +4,7 @@ import os
 import psutil
 import shutil
 
-def CheckInputPackage(package_name):
+def check_input_package(package_name):
     # No package name given by user, continue
     if package_name == None or package_name.strip() == "":
         return False
@@ -12,12 +12,12 @@ def CheckInputPackage(package_name):
     package_path = "Nuspec/" + package_name + ".nuspec"
     return os.path.isfile(os.path.abspath(package_path))
 
-def CheckRunningProcess(process_name):
+def check_running_process(process_name):
     if process_name in (p.name() for p in psutil.process_iter()):
         return True
     return False
 
-def CleanPreviousInstallations(package_id):
+def clean_previous_package_installations(package_id):
     # Find different versions than defined in config file
     other_versions = [name for name in os.listdir(".") if os.path.isdir(name) and name.split(".")[0] == package_id]
     
@@ -28,7 +28,7 @@ def CleanPreviousInstallations(package_id):
             # Removal was unsuccessful
             print("Cannot clean deprecated package in " + os.path.abspath(package_root))
 
-def CheckInstallation(package_id, package_version):
+def check_package_installation(package_id, package_version):
     # Check installation correctness from file list in related .nuspec file
     tree = ET.parse("Nuspec/" + package_id + ".nuspec")
     files = tree.findall('files/file')
@@ -44,7 +44,7 @@ def CheckInstallation(package_id, package_version):
     # Package installation seems good
     return True
         
-def RemoveFaultyJunction(destination):
+def remove_faulty_junction(destination):
     if os.path.isdir(destination):
         try:
             shutil.rmtree(destination)
@@ -54,7 +54,7 @@ def RemoveFaultyJunction(destination):
             except:
                 return False
 
-def PurgeDestionation(destination):
+def purge_destination(destination):
     if os.path.islink(destination):
         try:
             os.unlink(destination)

@@ -11,7 +11,7 @@ uplugin_version_key = "VersionName"
 
 uplugin_ext = ".uplugin"
 
-def GetPluginVersion(plugin_name):
+def get_plugin_version(plugin_name):
     plugin_root = "../Plugins/" + plugin_name
     for uplugin_path in glob.glob(plugin_root + "/*" + uplugin_ext):
         with open(uplugin_path, "r") as uplugin_file:  
@@ -21,16 +21,16 @@ def GetPluginVersion(plugin_name):
             if version.count('.') == 1:
                 version = version + ".0"
             return version
-    return "0.0.0"
+    return None
 
-def GetProjectVersion():
+def get_project_version():
     with open(defaultgame_path, "r") as ini_file:
         for ln in ini_file:
             if ln.startswith(defaultgame_version_key):
                 return ln.replace(defaultgame_version_key, '').rstrip()
-    return "0.0.0"
+    return None
 
-def GetSuffix():
+def get_suffix():
     try:
         with open(uproject_path, "r") as uproject_file:  
             data = json.load(uproject_file)
@@ -38,8 +38,8 @@ def GetSuffix():
             build_version = "b" + engine_association[-8:]
             # We're using local build version in .uproject file
             if "}" in build_version:
-                return ""
+                return None
             return "b" + engine_association[-8:]
     except:
-        return ""
-    return ""
+        return None
+    return None
