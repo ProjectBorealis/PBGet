@@ -96,7 +96,7 @@ def push_package(package_full_name, source_name):
     return subprocess.call(["nuget.exe", "push", "-Timeout", str(push_timeout), "-Source", source_name, package_full_name])
 
 def set_api_key(api_key):
-    return subprocess.call(["nuget.exe", "set_api_key", api_key])
+    return subprocess.call(["nuget.exe", "SetApiKey", api_key])
 ############################################################################
 
 ### Other Functions
