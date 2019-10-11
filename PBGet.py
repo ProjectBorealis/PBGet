@@ -21,7 +21,7 @@ import colorama
 from colorama import Fore, Back, Style
 
 ### Globals
-pbget_version = "0.0.7"
+pbget_version = "0.0.8"
 
 binaries_folder_name = "Binaries"
 nuget_source = ""
@@ -112,25 +112,17 @@ def push_interrupt_handler(signal, frame):
             sys.exit(1)
     sys.exit(0)
 
-def update_version(package_id, new_package_version):
-    config_xml = ET.parse(config_name)
-    for package in config_xml.getroot().findall("package"):
-        if package.attrib['id'] == package_id and package.attrib['version'] != new_package_version:
-            package.attrib['version'] = new_package_version
-            try:
-                config_xml.write(config_name)
-            except:
-                return False
-            return True
-    return True
-
 def ignore_existing_installations(packages):
     fmt = '{:<25} {:<25} {:<40}'
     for package in packages.findall("package"):
         package_id = package.attrib['id']
         suffix = PBParser.get_suffix()
         if suffix != None:
-            package_version = package.attrib['version'] + "-" + suffix
+            package_version = PBParser.get_plugin_version(package_id)
+            if package_version == None:
+                # If plugin is not found, default to project version.
+                package_version = PBParser.get_project_version()
+            package_version = package_version + "-" + suffix
             if PBTools.check_package_installation(package_id, package_version):
                 log_success(fmt.format(package_id, package_version, "Version already installed"), False)
                 packages.remove(package)
@@ -174,11 +166,10 @@ def process_package(package):
         log_error("Can't find id property for " + package + ". This package won't be installed.")
         return
    
-    try:
-        package_version = package.attrib['version']
-    except:
-        log_error("Can't find version property for " + package_id + ". This package won't be installed.")
-        return
+    package_version = PBParser.get_plugin_version(package_id)
+    if package_version == None:
+        # If plugin is not found, default to project version.
+        package_version = PBParser.get_project_version()
 
     version_suffix = PBParser.get_suffix() 
 
@@ -248,12 +239,6 @@ def push_from_nuscpec(nuspec_file):
         log_warning("Cannot remove temporary nupkg file: " + package_full_name)
 
     log_success("Push successful: " + package_id + "." + package_full_version)
-
-    # Update version in the packages file
-    if update_version(package_id, package_version):
-        log_success("Version for " + package_id + " successfully updated as " + package_version + " in " + config_name)
-    else:
-        log_warning("Problem while updating version for " + package_id + " as " + package_version + " in " + config_name + ". Consider changing the version manually.")
 
     return True
 ############################################################################
