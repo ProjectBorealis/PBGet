@@ -24,10 +24,13 @@ def get_plugin_version(plugin_name):
     return None
 
 def get_project_version():
-    with open(defaultgame_path, "r") as ini_file:
-        for ln in ini_file:
-            if ln.startswith(defaultgame_version_key):
-                return ln.replace(defaultgame_version_key, '').rstrip()
+    try:
+        with open(defaultgame_path, "r") as ini_file:
+            for ln in ini_file:
+                if ln.startswith(defaultgame_version_key):
+                    return ln.replace(defaultgame_version_key, '').rstrip()
+    except:
+        return None
     return None
 
 def get_suffix():

@@ -21,7 +21,7 @@ import colorama
 from colorama import Fore, Back, Style
 
 ### Globals
-pbget_version = "0.0.8"
+pbget_version = "0.0.9"
 
 binaries_folder_name = "Binaries"
 nuget_source = ""
@@ -229,8 +229,12 @@ def push_from_nuscpec(nuspec_file):
 
     # Push prepared package
     if push_package(package_full_name, nuget_source) != 0:
-        log_error("Could not push package into source: " + package_full_name)
-        return False
+        if package_type == "Main":
+            # Do not care about return state of plugin pushes, their versions are mostly same, and we will get version already exists error from NuGet
+            log_error("Could not push main package into source: " + package_full_name)
+            return False
+        else:
+            log_warning("Could not push plugin package into source: " + package_full_name)
 
     # Cleanup
     try:
